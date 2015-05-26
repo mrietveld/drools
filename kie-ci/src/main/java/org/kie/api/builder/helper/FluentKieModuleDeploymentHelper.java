@@ -86,6 +86,13 @@ public abstract class FluentKieModuleDeploymentHelper extends KieModuleDeploymen
     public abstract FluentKieModuleDeploymentHelper addResourceFilePath(String... resourceFilePath);
 
     /**
+     * Add a path containing the pom.xml file to use. 
+     * @param resourceFilePath The pom file path
+     * @return The helper instance
+     */
+    public abstract FluentKieModuleDeploymentHelper setPomFilePath(String pomFilePath);
+    
+    /**
      * Set the list of classes to be added to the Kjar.
      * @param classesForKjar The list of classes
      * @return The helper instance

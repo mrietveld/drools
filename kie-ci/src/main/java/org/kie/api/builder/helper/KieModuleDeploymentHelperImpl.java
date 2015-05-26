@@ -28,6 +28,7 @@ import org.kie.api.builder.model.KieModuleModel;
 import org.kie.api.runtime.KieSession;
 import org.kie.scanner.MavenRepository;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,6 +46,25 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 import static org.kie.scanner.MavenRepository.getMavenRepository;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.drools.compiler.kie.builder.impl.InternalKieModule;
+import org.drools.compiler.kproject.ReleaseIdImpl;
+import org.drools.core.util.IoUtils;
+import org.junit.Assert;
+import org.kie.api.KieBase;
+import org.kie.api.builder.KieBuilder;
+import org.kie.api.builder.KieFileSystem;
+import org.kie.api.builder.KieModule;
+import org.kie.api.builder.Message;
+import org.kie.api.builder.ReleaseId;
+import org.kie.api.builder.model.KieModuleModel;
+import org.kie.api.runtime.KieSession;
+import org.kie.scanner.MavenRepository;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /**
  * This is the main class where all interfaces and code comes together. 
@@ -55,10 +75,22 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
      * package scope: Because users will do very unexpected things.
      */
 
-    private KieModuleDeploymentConfig config;
+    private ThreadLocal<KieModuleDeploymentConfig> localConfig = new ThreadLocal<KieModuleDeploymentConfig>() { 
+        @Override
+        protected KieModuleDeploymentConfig initialValue() {
+           return new KieModuleDeploymentConfig();
+        }
+    };
     
     KieModuleDeploymentHelperImpl() { 
-        config = new KieModuleDeploymentConfig();
+    }
+    
+    private KieModuleDeploymentConfig getConfig() { 
+        return localConfig.get();
+    }
+
+    private void resetConfig() { 
+        localConfig.set(new KieModuleDeploymentConfig());
     }
 
     /**
@@ -68,42 +100,42 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
     @Override
     public FluentKieModuleDeploymentHelper setGroupId(String groupId) { 
         assertNotNull( groupId, "groupId");
-        this.config.setGroupId(groupId);
+        getConfig().setGroupId(groupId);
         return this;
     }
     
     @Override
     public FluentKieModuleDeploymentHelper setArtifactId(String artifactId) { 
         assertNotNull( artifactId, "artifactId");
-        this.config.setArtifactId(artifactId);
+        getConfig().setArtifactId(artifactId);
         return this;
     }
     
     @Override
     public FluentKieModuleDeploymentHelper setVersion(String version) { 
         assertNotNull( version, "version");
-        this.config.setVersion(version);
+        getConfig().setVersion(version);
         return this;
     }
     
     @Override
     public FluentKieModuleDeploymentHelper setKBaseName(String kbaseName) {
         assertNotNull(kbaseName, "kbase name");
-        this.config.setKbaseName(kbaseName);
+        getConfig().setKbaseName(kbaseName);
         return this;
     }
 
     @Override
     public FluentKieModuleDeploymentHelper setKieSessionname(String ksessionName) {
         assertNotNull(ksessionName, "ksession name");
-        this.config.setKsessionName(ksessionName);
+        getConfig().setKsessionName(ksessionName);
         return this;
     }
     
     @Override
     public FluentKieModuleDeploymentHelper setResourceFilePaths(List<String> resourceFilePaths) {
         assertNotNull( resourceFilePaths, "resourceFilePaths");
-        this.config.resourceFilePaths.addAll(resourceFilePaths);
+        getConfig().resourceFilePaths.addAll(resourceFilePaths);
         return this;
     }
     
@@ -112,15 +144,22 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
         assertNotNull( resourceFilePath, "resourceFilePath");
         for( int i = 0; i < resourceFilePath.length; ++i ) { 
             assertNotNull( resourceFilePath[i], "resourceFilePath[" + i + "]");
-            this.config.resourceFilePaths.add(resourceFilePath[i]);
+            getConfig().resourceFilePaths.add(resourceFilePath[i]);
         }
         return this;
     }
     
     @Override
+    public FluentKieModuleDeploymentHelper setPomFilePath( String pomFilePath ) {
+        assertNotNull( pomFilePath, "pomFilePath");
+        getConfig().setPomFilePath(pomFilePath);
+        return this;
+    }
+
+    @Override
     public FluentKieModuleDeploymentHelper setClasses(List<Class<?>> classesForKjar) { 
         assertNotNull( classesForKjar, "classesForKjar");
-        this.config.classes.addAll(classesForKjar);
+        getConfig().classes.addAll(classesForKjar);
         return this;
     }
     
@@ -129,7 +168,7 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
         assertNotNull( classForKjar, "classForKjar");
         for( int i = 0; i < classForKjar.length; ++i ) { 
             assertNotNull( classForKjar[i], "classForKjar[" + i + "]");
-            this.config.classes.add(classForKjar[i]);
+            getConfig().classes.add(classForKjar[i]);
         }
         return this;
     }
@@ -137,7 +176,7 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
     @Override
     public FluentKieModuleDeploymentHelper setDependencies(List<String> dependencies) { 
         assertNotNull( dependencies, "dependencies");
-        this.config.dependencies.addAll(dependencies);
+        getConfig().dependencies.addAll(dependencies);
         return this;
     }
     
@@ -146,35 +185,30 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
         assertNotNull( dependency, "dependency");
         for( int i = 0; i < dependency.length; ++i ) { 
             assertNotNull( dependency[i], "dependency[" + i + "]");
-            this.config.dependencies.add(dependency[i]);
+            getConfig().dependencies.add(dependency[i]);
         }
         return this;
     }
     
     @Override
     public KieModuleModel getKieModuleModel() {
-        return config.getKieProject();
+        return getConfig().getKieProject();
     }
 
     @Override
     public FluentKieModuleDeploymentHelper resetHelper() {
-        this.config = new KieModuleDeploymentConfig();
+        resetConfig();
         return this;
     }
 
     @Override
     public KieModule createKieJar() {
-        config.checkComplete();
-        return internalCreateKieJar(config.getReleaseId(), config.getKbaseName(), config.getKsessionName(), 
-                config.resourceFilePaths, config.classes, config.dependencies);
+        return internalCreateKieJar();
     }
 
     @Override
     public void createKieJarAndDeployToMaven() {
-        config.checkComplete();
-        internalCreateAndDeployKjarToMaven(config.getReleaseId(), config.getKbaseName(), config.getKsessionName(), 
-                config.resourceFilePaths, config.classes, 
-                config.dependencies);
+        internalCreateAndDeployKjarToMaven();
     }
     
     private static void assertNotNull(Object obj, String name) { 
@@ -192,8 +226,14 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
             String kbaseName,
             String ksessionName, 
             List<String> resourceFilePaths ) { 
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        return internalCreateKieJar(releaseId, kbaseName, ksessionName, resourceFilePaths, null, null);
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        return internalCreateKieJar();
     }
     
     @Override
@@ -203,8 +243,17 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
             List<String> bpmnFilePaths, 
             List<Class<?>> classes) {
         
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        return internalCreateKieJar(releaseId, kbaseName, ksessionName, bpmnFilePaths, classes, null);
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        config.classes = classes;
+        config.resourceFilePaths.addAll(bpmnFilePaths);
+        
+        return internalCreateKieJar();
     }
     
     @Override
@@ -215,29 +264,69 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
             List<Class<?>> classes, 
             List<String> dependencies) {
         
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        return internalCreateKieJar(releaseId, kbaseName, ksessionName, bpmnFilePaths, classes, dependencies);
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        config.classes = classes;
+        config.resourceFilePaths.addAll(bpmnFilePaths);
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.dependencies.addAll(dependencies);
+        
+        return internalCreateKieJar();
     }
     
     @Override
     public void createKieJarAndDeployToMaven(String groupId, String artifactId, String version, String kbaseName,
             String ksessionName, List<String> resourceFilePaths) {
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        internalCreateAndDeployKjarToMaven(releaseId, kbaseName, ksessionName, resourceFilePaths, null, null);
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        config.resourceFilePaths.addAll(resourceFilePaths);
+        
+        internalCreateAndDeployKjarToMaven();
     }
 
     @Override
     public void createKieJarAndDeployToMaven(String groupId, String artifactId, String version, String kbaseName,
             String ksessionName, List<String> resourceFilePaths, List<Class<?>> classesForKjar) {
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        internalCreateAndDeployKjarToMaven(releaseId, kbaseName, ksessionName, resourceFilePaths, classesForKjar, null);
+        
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        config.resourceFilePaths.addAll(resourceFilePaths);
+        config.classes.addAll(classesForKjar);
+        
+        internalCreateAndDeployKjarToMaven();
     }
 
     @Override
     public void createKieJarAndDeployToMaven(String groupId, String artifactId, String version, String kbaseName,
             String ksessionName, List<String> resourceFilePaths, List<Class<?>> classesForKjar, List<String> dependencies) {
-        ReleaseId releaseId = new ReleaseIdImpl(groupId, artifactId, version);
-        internalCreateAndDeployKjarToMaven(releaseId, kbaseName, ksessionName, resourceFilePaths, classesForKjar, dependencies);
+        
+        KieModuleDeploymentConfig config = getConfig();
+        config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+        config.setGroupId(groupId); 
+        config.setArtifactId(artifactId);
+        config.setVersion(version);
+        config.setKbaseName(kbaseName);
+        config.setKsessionName(ksessionName);
+        config.resourceFilePaths.addAll(resourceFilePaths);
+        config.classes.addAll(classesForKjar);
+        config.dependencies.addAll(dependencies);
+        
+        internalCreateAndDeployKjarToMaven();
     }
     
     /**
@@ -254,19 +343,12 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
      * @param classes
      * @param dependencies
      */
-    private synchronized void internalCreateAndDeployKjarToMaven(ReleaseId releaseId,
-            String kbaseName, 
-            String ksessionName,
-            List<String> resourceFilePaths,
-            List<Class<?>> classes, 
-            List<String> dependencies) {
+    private synchronized void internalCreateAndDeployKjarToMaven() { 
         
-        InternalKieModule kjar = (InternalKieModule) internalCreateKieJar(releaseId, 
-                kbaseName, ksessionName, 
-                resourceFilePaths, classes,
-                dependencies);
-        
-        String pomFileName = MavenRepository.toFileName(releaseId, null) + ".pom";
+        InternalKieModule kjar = (InternalKieModule) internalCreateKieJar();
+      
+        KieModuleDeploymentConfig config = getConfig();
+        String pomFileName = MavenRepository.toFileName(config.getReleaseId(), null) + ".pom";
         File pomFile = new File(System.getProperty("java.io.tmpdir"), pomFileName);
         try {
             FileOutputStream fos = new FileOutputStream(pomFile);
@@ -292,18 +374,14 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
      * 
      * @return The {@link InternalKieModule} which represents the KJar.
      */
-    private synchronized KieModule internalCreateKieJar(ReleaseId releaseId, 
-            String kbaseName,
-            String ksessionName,
-            List<String> resourceFilePaths, 
-            List<Class<?>> classes, 
-            List<String> dependencies) {
+    private synchronized KieModule internalCreateKieJar() { 
         
-        
+       
+        KieModuleDeploymentConfig config = getConfig();
         ReleaseId [] releaseIds = { };
-        if( dependencies != null && dependencies.size() > 0 ) { 
+        if( config.dependencies != null && config.dependencies.size() > 0 ) { 
             List<ReleaseId> depReleaseIds = new ArrayList<ReleaseId>();
-            for( String dep : dependencies ) { 
+            for( String dep : config.dependencies ) { 
                 String [] gav = dep.split(":");
                 if( gav.length != 3 ) { 
                     throw new IllegalArgumentException("Dependendency id '" + dep  + "' does not conform to the format <groupId>:<artifactId>:<version> (Classifiers are not accepted).");
@@ -312,22 +390,54 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
             }
             releaseIds = depReleaseIds.toArray(new ReleaseId[depReleaseIds.size()]);
         }
-        config.pomText = getPomText(releaseId, releaseIds);
+        if( config.pomFilePath == null ) { 
+            config.checkComplete();
+            config.pomText = getPomText(config.getReleaseId(), releaseIds);
+        } else { 
+            config.pomText = getPomText(config.pomFilePath);
+            
+            try { 
+                DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+                Document dom = db.parse(new ByteArrayInputStream(config.pomText.getBytes()));
+                NodeList nodes = dom.getChildNodes().item(0).getChildNodes();
+                String groupId = null, artifactId = null, version = null;
+                for( int i = 0; i < nodes.getLength(); ++i ) { 
+                    Node node = nodes.item(i);
+                    if( "groupId".equals(node.getNodeName()) ) { 
+                        groupId = node.getTextContent();
+                    } else if( "artifactId".equals(node.getNodeName()) ) { 
+                        artifactId = node.getTextContent();
+                    } else if( "version".equals(node.getNodeName()) ) {
+                        version = node.getTextContent();
+                    }
+                }
+                String [] check = { groupId, artifactId, version };
+                String [] names = { "groupId", "artifactId", "version" };
+                for( int i = 0 ; i < check.length; ++i ) { 
+                   if( check[i] == null ) { 
+                       throw new IllegalArgumentException("The pom file given does not contain a " + names[i] + " [" + config.pomFilePath + "]" );
+                   }
+                } 
+                config.setReleaseId(new ReleaseIdImpl(groupId, artifactId, version));
+            } catch( Exception e ) { 
+               throw new IllegalArgumentException("Unable to parse xml of pom.xml file [" + config.pomFilePath + "]" ); 
+            }
+        }
         
-        KieFileSystem kfs = createKieFileSystemWithKProject(kbaseName, ksessionName);
-        kfs.writePomXML(this.config.pomText);
+        KieFileSystem kfs = createKieFileSystemWithKProject(config.getKbaseName(), config.getKsessionName());
+        kfs.writePomXML(config.pomText);
     
-        List<KJarResource> resourceFiles = loadResources(resourceFilePaths);
+        List<KJarResource> resourceFiles = loadResources(config.resourceFilePaths);
         for (KJarResource resource : resourceFiles) {
-            kfs.write("src/main/resources/" + kbaseName + "/" + resource.name, resource.content);
+            kfs.write("src/main/resources/" + config.getKbaseName() + "/" + resource.name, resource.content);
         }
     
-        if( classes != null ) { 
-            for( Class<?> userClass : classes ) {
+        if( config.classes != null ) { 
+            for( Class<?> userClass : config.classes ) {
                 addClass(userClass, kfs);
             }
         }
-    
+   
         KieBuilder kieBuilder = config.getKieServicesInstance().newKieBuilder(kfs);
         int buildMsgs = 0;
         for( Message buildMsg : kieBuilder.buildAll().getResults().getMessages() ) { 
@@ -349,8 +459,8 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
      * @return
      */
     private KieFileSystem createKieFileSystemWithKProject(String kbaseName, String ksessionName) {
-        KieModuleModel kproj = config.getKieProject();
-        KieFileSystem kfs = config.getKieServicesInstance().newKieFileSystem();
+        KieModuleModel kproj = getConfig().getKieProject();
+        KieFileSystem kfs = getConfig().getKieServicesInstance().newKieFileSystem();
         kfs.writeKModuleXML(kproj.toXML());
         return kfs;
     }
@@ -389,6 +499,34 @@ final class KieModuleDeploymentHelperImpl extends FluentKieModuleDeploymentHelpe
         return pom;
     }
 
+    private static String getPomText(String pomFilePath)  {
+        String pom = null; 
+
+        if( ! pomFilePath.startsWith("/") ) { 
+           pomFilePath = "/" + pomFilePath; 
+        }
+        
+        InputStream pomInputStream = KieModuleDeploymentHelperImpl.class.getResourceAsStream(pomFilePath);
+        if( pomInputStream == null ) { 
+            throw new IllegalArgumentException("Could not open pom file at '" + pomFilePath + "'");
+        }
+
+        int bytesRead;
+        try {
+            int availableBytes = pomInputStream.available();
+            byte[] b = new byte[availableBytes];
+            ByteArrayOutputStream bos = new ByteArrayOutputStream(pomInputStream.available());
+            for(;(bytesRead = pomInputStream.read(b)) != -1; ) {
+                bos.write(b, 0, bytesRead);
+            }
+            pom = new String(bos.toByteArray());
+        } catch( IOException e ) {
+            // no-op
+        }
+
+        return pom;
+    }
+    
     /**
      * Create a list of {@link KJarResource} instances with the process files to be included in the KJar.
      * 

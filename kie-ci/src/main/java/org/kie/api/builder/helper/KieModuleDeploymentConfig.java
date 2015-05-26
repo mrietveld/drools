@@ -39,13 +39,14 @@ public class KieModuleDeploymentConfig {
     private String kbaseName = null;
     private String ksessionName = null;
     
+    String pomFilePath = null;
     List<String> resourceFilePaths = new ArrayList<String>();
     List<Class<?>> classes = new ArrayList<Class<?>>();
     List<String> dependencies = new ArrayList<String>();
     
     private KieModuleModel kproj = null;
     String pomText;
-
+    
     public KieModuleDeploymentConfig() { 
         KieServices ks = new KieServicesImpl() {
             public KieRepository getRepository() {
@@ -69,7 +70,7 @@ public class KieModuleDeploymentConfig {
     
     /**
      * Getter/Setter's
-     */
+     */ 
     
     void setGroupId(String groupId) { 
         this.groupId = groupId;
@@ -90,6 +91,10 @@ public class KieModuleDeploymentConfig {
         return releaseId;
     }
 
+    void setReleaseId( ReleaseId releaseId ) {
+        this.releaseId = releaseId;
+    }
+    
     void setKbaseName(String kbaseName) {
         this.kbaseName = kbaseName;
     }
@@ -111,7 +116,10 @@ public class KieModuleDeploymentConfig {
         }
         return ksessionName;
     }
-    
+   
+    void setPomFilePath(String pomFilePath) { 
+        this.pomFilePath = pomFilePath;
+    } 
     
     /**
      * Other methods
@@ -144,4 +152,6 @@ public class KieModuleDeploymentConfig {
 
         return kproj;
     }
+
+
 }

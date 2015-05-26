@@ -15,7 +15,7 @@
 
 package org.kie.api.builder.helper;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,6 +30,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.drools.core.impl.EnvironmentImpl;
+import org.eclipse.aether.artifact.Artifact;
 import org.junit.After;
 import org.junit.Test;
 import org.kie.api.builder.KieModule;
@@ -210,5 +211,66 @@ public class KieModuleDeploymentHelperTest {
         }
         assertEquals("Num files in kjar", numFiles, jarFiles.size());
         assertEquals("Num dirs in kjar", numDirs, jarDirs.size());
+    }
+    
+    @Test
+    public void testFluentDeploymentHelperWithPomFilePath() throws Exception {
+        String content = "test file created by " + this.getClass().getSimpleName();
+        File tempFile = File.createTempFile(UUID.randomUUID().toString(), ".tst");
+        tempFile.deleteOnExit();
+        FileOutputStream fos = new FileOutputStream(tempFile);
+        fos.write(content.getBytes());
+        fos.close();
+        
+        FluentKieModuleDeploymentHelper deploymentHelper = KieModuleDeploymentHelper.newFluentInstance();
+
+        String groupId = "org.kie.test";
+        String artifactId = "builder-pom-module";
+        String version = "1.2.3-SNAPSHOT";
+        
+        deploymentHelper = deploymentHelper
+                .setPomFilePath("builder/pom.xml")
+                .addResourceFilePath("builder/test/", "builder/simple_query_test.drl")
+                .addResourceFilePath(tempFile.getAbsolutePath())
+                .addResourceFilePath("/META-INF/WorkDefinitions.conf") // from the drools-core jar
+                .addClass(KieModuleDeploymentHelperTest.class)
+                .addClass(KieModule.class)
+                .addClass(org.drools.compiler.Cheese.class);
+        
+        deploymentHelper.createKieJarAndDeployToMaven();
+
+        String releaseId = groupId + ":" + artifactId + ":" + version;
+        Artifact artifact = MavenRepository.getMavenRepository().resolveArtifact(releaseId);
+        assertNotNull( "Could not resolve artifact '" + releaseId + ";");
+        File artifactFile = artifact.getFile();
+        zip = new ZipInputStream(new FileInputStream(artifactFile));
+
+        Set<String> jarFiles = new HashSet<String>();
+        Set<String> jarDirs = new HashSet<String>();
+        ZipEntry ze = zip.getNextEntry();
+        logger.debug("Getting files form deployed jar: ");
+        boolean pomXmlFound = false;
+        while( ze != null ) { 
+            String fileName = ze.getName();
+            if( fileName.endsWith("drl")
+                    || fileName.endsWith("class")
+                    || fileName.endsWith("tst")
+                    || fileName.endsWith("conf")
+                    || fileName.endsWith("xml")
+                    || fileName.endsWith("info")
+                    || fileName.endsWith("properties")
+                    || fileName.endsWith("cache") ) { 
+                jarFiles.add(fileName);
+                logger.debug("> " + fileName);
+                if( fileName.contains("pom.xml") ) { 
+                    pomXmlFound = true;
+                }
+            } else { 
+                jarDirs.add(fileName);
+                logger.debug("] " + fileName);
+            }
+            ze = zip.getNextEntry();
+        }
+        assertTrue( "No pom.xml file found!", pomXmlFound );
     }
 }
