@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -33,15 +33,15 @@ import com.sun.tools.xjc.Options;
 import org.kie.internal.builder.ScoreCardConfiguration;
 
 public class KnowledgeBuilderFactoryServiceImpl implements KnowledgeBuilderFactoryService {
-    
+
     public KnowledgeBuilderConfiguration newKnowledgeBuilderConfiguration() {
         return new KnowledgeBuilderConfigurationImpl();
     }
-    
+
     public KnowledgeBuilderConfiguration newKnowledgeBuilderConfiguration(Properties properties, ClassLoader... classLoaders) {
         return new KnowledgeBuilderConfigurationImpl(properties, classLoaders);
     }
-    
+
     public DecisionTableConfiguration newDecisionTableConfiguration() {
         return new DecisionTableConfigurationImpl();
     }
@@ -72,11 +72,10 @@ public class KnowledgeBuilderFactoryServiceImpl implements KnowledgeBuilderFacto
             return new KnowledgeBuilderImpl( (InternalKnowledgeBase)kbase, (KnowledgeBuilderConfigurationImpl) conf );
         } else {
             return new KnowledgeBuilderImpl((KnowledgeBuilderConfigurationImpl) conf );
-        }        
+        }
     }
 
-    public JaxbConfiguration newJaxbConfiguration(Options xjcOpts,
-                                                  String systemId) {
-        return new JaxbConfigurationImpl( xjcOpts, systemId );
+    public JaxbConfiguration newJaxbConfiguration(String systemId) {
+        return new JaxbConfigurationImpl( systemId );
     }
 }
