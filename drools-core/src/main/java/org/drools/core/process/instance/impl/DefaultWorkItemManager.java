@@ -40,7 +40,7 @@ public class DefaultWorkItemManager implements WorkItemManager, Externalizable {
     private static final long serialVersionUID = 510l;
 
     private AtomicLong workItemCounter = new AtomicLong(0);
-    private Map<Long, WorkItem> workItems = new ConcurrentHashMap<Long, WorkItem>();
+    protected Map<Long, WorkItem> workItems = new ConcurrentHashMap<Long, WorkItem>();
     private InternalKnowledgeRuntime kruntime;
     private Map<String, WorkItemHandler> workItemHandlers = new HashMap<String, WorkItemHandler>();
 
@@ -139,13 +139,9 @@ public class DefaultWorkItemManager implements WorkItemManager, Externalizable {
         // work item may have been aborted
         if (workItem != null) {
             (workItem).setResults(results);
-            ProcessInstance processInstance = kruntime.getProcessInstance(workItem.getProcessInstanceId());
             (workItem).setState(WorkItem.COMPLETED);
-            // process instance may have finished already
-            if (processInstance != null) {
-                processInstance.signalEvent("workItemCompleted", workItem);
-            }
-            workItems.remove(new Long(id));
+            ProcessInstance processInstance = kruntime.getProcessInstance(workItem.getProcessInstanceId());
+            signalEventAndRemoveWorkItem(processInstance, "workItemCompleted", workItem);
         }
     }
 
@@ -153,14 +149,18 @@ public class DefaultWorkItemManager implements WorkItemManager, Externalizable {
         WorkItemImpl workItem = (WorkItemImpl) workItems.get(new Long(id));
         // work item may have been aborted
         if (workItem != null) {
-            ProcessInstance processInstance = kruntime.getProcessInstance(workItem.getProcessInstanceId());
             workItem.setState(WorkItem.ABORTED);
-            // process instance may have finished already
-            if (processInstance != null) {
-                processInstance.signalEvent("workItemAborted", workItem);
-            }
-            workItems.remove(new Long(id));
+            ProcessInstance processInstance = kruntime.getProcessInstance(workItem.getProcessInstanceId());
+            signalEventAndRemoveWorkItem(processInstance, "workItemAborted", workItem);
         }
+    }
+
+    protected void signalEventAndRemoveWorkItem(ProcessInstance processInstance, String event, WorkItem workItem) {
+        // process instance may have finished already
+        if (processInstance != null) {
+            processInstance.signalEvent(event, workItem);
+        }
+        workItems.remove(workItem.getId());
     }
 
     public void registerWorkItemHandler(String workItemName, WorkItemHandler handler) {
@@ -170,12 +170,12 @@ public class DefaultWorkItemManager implements WorkItemManager, Externalizable {
     public void clear() {
         this.workItems.clear();
     }
-    
-    public void signalEvent(String type, Object event) { 
+
+    public void signalEvent(String type, Object event) {
         this.kruntime.signalEvent(type, event);
-    } 
-    
-    public void signalEvent(String type, Object event, long processInstanceId) { 
+    }
+
+    public void signalEvent(String type, Object event, long processInstanceId) {
         this.kruntime.signalEvent(type, event, processInstanceId);
     }
 
