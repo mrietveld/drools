@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -14,6 +14,18 @@
 */
 
 package org.drools.compiler.compiler;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 import org.drools.compiler.builder.impl.KnowledgeBuilderConfigurationImpl;
 import org.drools.compiler.builder.impl.KnowledgeBuilderImpl;
@@ -60,13 +72,6 @@ import org.kie.internal.builder.ResultSeverity;
 import org.kie.internal.builder.conf.DefaultDialectOption;
 import org.kie.internal.builder.conf.KBuilderSeverityOption;
 import org.kie.internal.utils.ChainedProperties;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-
-import static org.junit.Assert.*;
 
 public class PackageBuilderConfigurationTest {
 
@@ -381,8 +386,9 @@ public class PackageBuilderConfigurationTest {
             return this.rule;
         }
 
-        public void compileAll() {
+        public PackageCompilationResult compileAll() {
             this.compileAll = true;
+            return new PackageCompilationResult(this.pkg.getName());
         }
 
         public boolean isCompileAll() {
@@ -504,7 +510,7 @@ public class PackageBuilderConfigurationTest {
             // TODO Auto-generated method stub
             return null;
         }
-        
+
         public AnalysisResult analyzeExpression( PackageBuildContext context,
                                                  BaseDescr descr,
                                                  Object content,
