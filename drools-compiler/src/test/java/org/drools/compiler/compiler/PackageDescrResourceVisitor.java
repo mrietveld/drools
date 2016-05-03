@@ -1,9 +1,23 @@
+/*
+ * Copyright 2014 JBoss, by Red Hat, Inc
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.drools.compiler.compiler;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-import org.drools.compiler.lang.descr.AccessorDescr;
 import org.drools.compiler.lang.descr.AccumulateDescr;
 import org.drools.compiler.lang.descr.AccumulateImportDescr;
 import org.drools.compiler.lang.descr.ActionDescr;
@@ -17,8 +31,8 @@ import org.drools.compiler.lang.descr.BehaviorDescr;
 import org.drools.compiler.lang.descr.BindingDescr;
 import org.drools.compiler.lang.descr.CollectDescr;
 import org.drools.compiler.lang.descr.ConstraintConnectiveDescr;
-import org.drools.compiler.lang.descr.DeclarativeInvokerDescr;
 import org.drools.compiler.lang.descr.EntryPointDeclarationDescr;
+import org.drools.compiler.lang.descr.EntryPointDescr;
 import org.drools.compiler.lang.descr.EnumDeclarationDescr;
 import org.drools.compiler.lang.descr.EvalDescr;
 import org.drools.compiler.lang.descr.ExistsDescr;
@@ -70,9 +84,7 @@ public class PackageDescrResourceVisitor {
             lastMethodName = thisMethodName;
         }
 
-        if( descr instanceof AccessorDescr ) {
-            visit((AccessorDescr) descr);
-        } else if( descr instanceof AccumulateDescr ) {
+        if( descr instanceof AccumulateDescr ) {
             visit((AccumulateDescr) descr);
         } else if( descr instanceof ActionDescr ) {
             visit((ActionDescr) descr);
@@ -90,6 +102,10 @@ public class PackageDescrResourceVisitor {
             visit((CollectDescr) descr);
         } else if( descr instanceof ConstraintConnectiveDescr ) {
             visit((ConstraintConnectiveDescr) descr);
+        } else if ( descr instanceof EntryPointDeclarationDescr ) {
+            visit( (EntryPointDeclarationDescr) descr );
+        } else if ( descr instanceof EntryPointDescr ) {
+            visit( (EntryPointDescr) descr );
         } else if( descr instanceof ExistsDescr ) {
             visit((ExistsDescr) descr);
         } else if( descr instanceof ExprConstraintDescr ) {
@@ -149,19 +165,16 @@ public class PackageDescrResourceVisitor {
         }
     }
 
-    protected void visit( final AccessorDescr descr ) {
-        checkResource(descr);
-        for( DeclarativeInvokerDescr d : descr.getInvokersAsArray() ) {
-            visit(d);
-        }
-    }
-
     protected void visit( final AccumulateDescr descr ) {
         checkResource(descr);
         visit(descr.getInputPattern());
         for( BaseDescr d : descr.getDescrs() ) {
             visit(d);
         }
+    }
+
+    protected void visit( final AccumulateImportDescr descr ) {
+        checkResource(descr);
     }
 
     protected void visit( final ActionDescr descr ) {
@@ -207,6 +220,17 @@ public class PackageDescrResourceVisitor {
         for( BaseDescr d : descr.getDescrs() ) {
             visit(d);
         }
+    }
+
+    protected void visit( final EntryPointDeclarationDescr descr ) {
+        checkResource(descr);
+        for( AnnotationDescr annoDescr : descr.getAnnotations() ) {
+            visit(annoDescr);
+        }
+    }
+
+    protected void visit( final EntryPointDescr descr ) {
+        checkResource(descr);
     }
 
     protected void visit( final ExistsDescr descr ) {
@@ -295,23 +319,30 @@ public class PackageDescrResourceVisitor {
     protected void visit( final PackageDescr descr ) {
         if( descr == null ) { return; }
         checkResource(descr);
-        for( ImportDescr importDescr : descr.getImports() ) {
-            visit(importDescr);
-        }
-        for( FunctionImportDescr funcImportDescr : descr.getFunctionImports() ) {
-            visit(funcImportDescr);
-        }
+
         for( AccumulateImportDescr accImportDescr : descr.getAccumulateImports() ) {
             visit(accImportDescr);
         }
         for( AttributeDescr attrDescr : descr.getAttributes() ) {
             visit(attrDescr);
         }
-        for( GlobalDescr globDesc : descr.getGlobals() ) {
-            visit(globDesc);
+        for( EntryPointDeclarationDescr entryPointDeclDescr : descr.getEntryPointDeclarations() ) {
+            visit( entryPointDeclDescr );
+        }
+        for( EnumDeclarationDescr enumDeclDescr : descr.getEnumDeclarations() ) {
+            visit( enumDeclDescr );
         }
         for( FunctionDescr funcDescr : descr.getFunctions() ) {
             visit(funcDescr);
+        }
+        for( FunctionImportDescr funcImportDescr : descr.getFunctionImports() ) {
+            visit(funcImportDescr);
+        }
+        for( GlobalDescr globDescr : descr.getGlobals() ) {
+            visit(globDescr);
+        }
+        for( ImportDescr importDescr : descr.getImports() ) {
+            visit(importDescr);
         }
         for( RuleDescr ruleDescr : descr.getRules() ) {
             visit(ruleDescr);
@@ -319,14 +350,8 @@ public class PackageDescrResourceVisitor {
         for( TypeDeclarationDescr typeDescr : descr.getTypeDeclarations() ) {
             visit(typeDescr);
         }
-        for( EntryPointDeclarationDescr entryDescr : descr.getEntryPointDeclarations() ) {
-            visit(entryDescr);
-        }
         for( WindowDeclarationDescr windowDescr : descr.getWindowDeclarations() ) {
             visit(windowDescr);
-        }
-        for( EnumDeclarationDescr enumDescr : descr.getEnumDeclarations() ) {
-            visit(enumDescr);
         }
     }
 
