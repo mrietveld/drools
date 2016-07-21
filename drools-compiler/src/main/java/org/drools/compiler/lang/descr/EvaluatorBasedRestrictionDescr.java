@@ -1,12 +1,12 @@
 /*
  * Copyright 2007 Red Hat, Inc. and/or its affiliates.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,7 +24,7 @@ import java.util.List;
  * This is a super class for all restrictions that are based on
  * evaluators.
  */
-public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
+public abstract class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
 
     private static final long serialVersionUID = 150l;
 
@@ -40,7 +40,7 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
 
     /**
      * Creates a new EvaluatorBasedRestriction
-     * 
+     *
      * @param evaluator the evaluator ID to be used in this restriction
      * @param isNegated true if the evaluator is boolean negated
      * @param parameterText the parameter text, in case there is any. null otherwise.
@@ -55,7 +55,7 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
 
     /**
      * Creates a new EvaluatorBasedRestriction
-     * 
+     *
      * @param evaluator the evaluator ID to be used in this restriction
      * @param isNegated true if the evaluator is boolean negated
      * @param parameterText the list of parameters texts, in case there is any. null otherwise.
@@ -79,7 +79,7 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
     /**
      * Returns true if this evaluator is boolean negated.
      * Example: "contains" is boolean negated if you want to check the elements that are not contained ("not contains")
-     * 
+     *
      * @return the negated
      */
     public boolean isNegated() {
@@ -90,7 +90,7 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
      * In case there is any parameter text, this method returns it. Returns null otherwise.
      * A parameter text is evaluator parameters like "after[1,10]". In the previous example,
      * the parameter text will be "1,10".
-     * 
+     *
      * @return the parameterText
      */
     public String getParameterText() {
@@ -109,11 +109,11 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
         }
         return null;
     }
-    
+
     public List<String> getParameters() {
         return parameters;
     }
-    
+
     public void setParameters( List<String> parameters ) {
         this.parameters = parameters;
     }
@@ -128,7 +128,7 @@ public class EvaluatorBasedRestrictionDescr extends RestrictionDescr {
     /**
      * Sets if this evaluator is negated.
      * Example: "contains" is boolean negated if you want to check the elements that are not contained ("not contains")
-     * 
+     *
      * @param negated the negated
      */
     public void setNegated( boolean negated ) {
