@@ -552,6 +552,127 @@ public class ResolutionOfTypesTest extends CommonTestMethodBase {
     }
 
     @Test
+    public void testTypeResolutionJavaClassesWildcardImport() {
+        // queries and Events make for interesting reference resolution
+        String drl =
+                "package test;\n" +
+                "import org.drools.compiler.integrationtests.eventgenerator.*;\n" +
+
+                "query 'all inserted events'\n" +
+                "    Event()\n" +
+                "end\n" +
+
+                "query 'all inserted events with generation time lt 1 min'\n" +
+                "    Event(eval(endTime<PseudoSessionClock.timeInMinutes(1)))\n" +
+                "end\n" +
+
+                "query 'all inserted events with 2 min lt generation time lt 3 min'\n" +
+                "    Event(eval (endTime>PseudoSessionClock.timeInMinutes(2)), eval(endTime<PseudoSessionClock.timeInMinutes(3)))\n" +
+                "end\n" +
+
+                "query 'all inserted events with parent resource A'\n" +
+                "    Event(parentId=='resA')\n" +
+                "end\n" +
+
+                "query 'all inserted events with parent resource B'\n" +
+                "    Event(parentId=='resB')\n" +
+                "end\n";
+
+        String drlResourcePath = "org/drools/compiler/integrationtests/eventgenerator/test.drl";
+
+        Map<String, Set<String>> typeReferences = compileResourceAndGetTypeReferences(drlResourcePath, drl);
+
+        assertNotNull( "No type references created during compilation!", typeReferences );
+        Set<String> testDrlTypeReferences = typeReferences.get(drlResourcePath);
+        assertTrue( "Expected type references for " + drlResourcePath,
+                testDrlTypeReferences != null && ! testDrlTypeReferences.isEmpty() );
+        assertTrue( testDrlTypeReferences.contains(Event.class.getName()) );
+
+        cleanJavaTypeReferences(testDrlTypeReferences);
+        assertEquals( "Only expected one reference!", 1, testDrlTypeReferences.size() );
+    }
+
+    @Test
+    public void testTypeResolutionTraitsAndExtend() {
+       String traitDrl =
+               "package org.drools.compiler.trait.test;\n" +
+               "import org.drools.core.factmodel.traits.*;\n" +
+               "global java.util.List list;\n" +
+
+               "declare trait Parent\n" +
+               "    child   : Student\n" +
+               "end\n" +
+
+               "declare trait Person\n" +
+               "    name    : String \n" +
+               "    age     : int   @position(0) \n" +
+               "end\n" +
+
+               "declare trait Role\n" +
+               "\n" +
+               "end\n" +
+
+               "declare trait Student extends Person, Role\n" +
+               "    school  : String\n" +
+               "end \n" +
+
+               "declare java.lang.Object\n" +
+               "    @Traitable\n" +
+               "end\n" +
+
+               "declare java.lang.String\n" +
+               "    @Traitable\n" +
+               "end\n";
+       String traitDrlPath = "org/drools/compiler/factmodel/traits/traitDef.drl";
+
+       String ruleDrl =
+               "package org.drools.compiler.trait.test;\n" +
+               "import org.drools.core.factmodel.traits.*;\n" +
+               "global java.util.List list;\n" +
+
+               "rule 'Check' \n" +
+               "when\n" +
+               "    $z: Student( $s : school == \"skl\", fields[ \"name\" ] == \"xx\", $a : age == 88 )\n" +
+               "then\n" +
+               "    list.add( \"DON\" );\n" +
+               "end \n";
+
+       String ruleDrlPath = "org/drools/compiler/factmodel/traits/traitRule.drl";
+       Map<String, Set<String>> typeReferences = compileResourceAndGetTypeReferences(
+                traitDrlPath, traitDrl,
+                ruleDrlPath, ruleDrl );
+
+       assertTrue( typeReferences.get(ruleDrlPath).contains("org.drools.compiler.trait.test.Student"));
+    }
+
+    @Test
+    public void testWildcardImportOnLHS() {
+        String drlSource = "import org.drools.compiler.*;\n" +
+                "rule RuleName when\n" +
+                "   Person( name == \"mark\", cheese.(price == 10, type.(length == 10) ) )\n" +
+                "then\n" +
+                "end\n";
+
+        String ruleDrlPath = "org/drools/compiler/rhsImport.drl";
+        Map<String, Set<String>> typeReferences = compileResourceAndGetTypeReferences(
+                 ruleDrlPath, drlSource);
+
+        assertFalse( "Expected references but found none!", typeReferences.isEmpty() );
+        assertTrue( "Expected references for compiled rule", typeReferences.containsKey(ruleDrlPath) );
+        Set<String> refs = typeReferences.get(ruleDrlPath);
+        assertFalse( "Empty reference set found for compiled rule", refs == null || refs.isEmpty() );
+        boolean refFound = false;
+        String classname = Person.class.getName();
+        for( String ref : refs ) {
+            if( ref.equals(classname) ) {
+                refFound = true;
+            }
+        }
+        assertTrue( "Reference to " + classname + " not found", refFound);
+
+    }
+
+    @Test
     public void testVarious() {
         String traitDrl =
                 "package org.drools.compiler.trait.test;\n" +
@@ -602,5 +723,85 @@ public class ResolutionOfTypesTest extends CommonTestMethodBase {
                 ruleDrlPath, ruleDrl );
 
         assertTrue( typeReferences.get(ruleDrlPath).contains("org.drools.compiler.trait.test.Student"));
+    }
+
+    @Test
+    public void testEnumReferences() {
+        String defStr = "package org.kie.test;\n" +
+                "\n" +
+                "declare enum Ennumm\n" +
+                "  ONE, TWO;\n" +
+                "end\n" +
+                "\n" +
+                "declare Bean\n" +
+                "  fld : Ennumm\n" +
+                "end\n" +
+                "\n";
+
+        String ruleStr = "package org.kie.test;\n" +
+                "query seeWhat( Ennumm $e, Bean $b )\n" +
+                "  $b := Bean( $e == Ennumm.ONE )\n" +
+                "end\n" +
+                "\n" +
+                "rule rool\n" +
+                "when\n" +
+                "then\n" +
+                "  insert( new Bean( Ennumm.ONE ) );\n" +
+                "end\n" +
+                "\n" +
+                "\n" +
+                "rule rool2\n" +
+                "when\n" +
+                "  seeWhat( $ex, $bx ; )\n" +
+                "then\n" +
+                "  System.out.println( $bx );\n" +
+                "end";
+
+        String defDrlPath = "org/drools/compiler/enum/enumDef.drl";
+        String enumRuleDrlPath = "org/drools/compiler/enum/enumRule.drl";
+
+        Map<String, Set<String>> typeReferences = compileResourceAndGetTypeReferences(
+                enumRuleDrlPath, ruleStr,
+                defDrlPath, defStr);
+
+        String enumClassName = "org.kie.test.Ennumm";
+        assertTrue( enumClassName + " not found in references", typeReferences.get(enumRuleDrlPath).contains(enumClassName));
+        String declaredClassname = "org.kie.test.Bean";
+        assertTrue( declaredClassname + " not found in references", typeReferences.get(enumRuleDrlPath).contains(declaredClassname));
+    }
+
+    @Test
+    public void testFunctionReferences() {
+        String defStr =
+                "package org.kie.test.refs;\n\n" +
+
+                "import java.util.List;\n" +
+                "import org.drools.compiler.Cheese;\n\n" +
+
+                "global java.util.List list\n\n" +
+
+                "function void addFive(List list) {\n" +
+                "    list.add( new Integer(5) );\n" +
+                "}\n";
+
+        String ruleStr = "package org.kie.test.refs;\n\n" +
+                "rule 'funcRule'\n" +
+                "  when\n" +
+                "    Cheese( )\n" +
+                "  then\n" +
+                "    addFive( list );\n" +
+                "end\n";
+
+        String defDrlPath = "org/drools/compiler/func/dev.drl";
+        String enumRuleDrlPath = "org/drools/compiler/func/rule.drl";
+
+        Map<String, Set<String>> typeReferences = compileResourceAndGetTypeReferences(
+                enumRuleDrlPath, ruleStr,
+                defDrlPath, defStr);
+
+        String enumClassName = "org.kie.test.Ennumm";
+        assertTrue( enumClassName + " not found in references", typeReferences.get(enumRuleDrlPath).contains(enumClassName));
+        String declaredClassname = "org.kie.test.Bean";
+        assertTrue( declaredClassname + " not found in references", typeReferences.get(enumRuleDrlPath).contains(declaredClassname));
     }
 }
